@@ -10,7 +10,7 @@
 /* ── Design tokens ───────────────────────────────────────────────────────── */
 :root {
     --sidebar-bg:        #01080e;
-    --sidebar-hover:     #1a2d44;
+    --sidebar-hover:     #334e6e;
     --sidebar-active:    #1e3a5f;
     --sidebar-border:    #1e3a5f;
     --sidebar-width:     260px;
