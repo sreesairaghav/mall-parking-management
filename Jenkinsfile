@@ -85,7 +85,7 @@ pipeline {
 
         stage('Login to ACR') {
             steps {
-                echo 'Authenticating with Azure Container Registry'
+                echo 'Logging in to Azure Container Registry'
 
                 bat '''
                     "%AZURE_CLI%" acr login --name %ACR_NAME%
@@ -95,18 +95,87 @@ pipeline {
 
         stage('Push Image to ACR') {
             steps {
-                echo 'Pushing Docker image to Azure Container Registry'
+                echo 'Pushing Docker image to ACR'
 
                 bat '''
                     docker push %ACR_LOGIN%/%IMAGE_NAME%:v%BUILD_NUMBER%
                 '''
             }
         }
+
+        stage('Deploy to AKS') {
+            steps {
+                echo 'Deploying application to Azure Kubernetes Service'
+
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'azure-sp',
+                        usernameVariable: 'AZURE_CLIENT_ID',
+                        passwordVariable: 'AZURE_CLIENT_SECRET'
+                    ),
+                    string(
+                        credentialsId: 'azure-tenant-id',
+                        variable: 'AZURE_TENANT_ID'
+                    )
+                ]) {
+                    bat '''
+                        @echo off
+
+                        echo Installing Kubernetes CLI tools...
+
+                        "%AZURE_CLI%" aks install-cli ^
+                        --install-location "%WORKSPACE%\\kubectl.exe" ^
+                        --kubelogin-install-location "%WORKSPACE%\\kubelogin.exe"
+
+                        if errorlevel 1 exit /b 1
+
+                        echo Connecting to AKS...
+
+                        "%AZURE_CLI%" aks get-credentials ^
+                        --resource-group %RESOURCE_GROUP% ^
+                        --name %AKS_NAME% ^
+                        --overwrite-existing
+
+                        if errorlevel 1 exit /b 1
+
+                        echo Configuring Kubernetes authentication...
+
+                        set "PATH=%WORKSPACE%;%PATH%"
+
+                        "%WORKSPACE%\\kubelogin.exe" convert-kubeconfig -l azurecli
+
+                        if errorlevel 1 exit /b 1
+
+                        echo Updating Mall Parking application...
+
+                        "%WORKSPACE%\\kubectl.exe" set image ^
+                        deployment/mall-parking-app ^
+                        mall-parking-app=%ACR_LOGIN%/%IMAGE_NAME%:v%BUILD_NUMBER%
+
+                        if errorlevel 1 exit /b 1
+
+                        echo Waiting for deployment rollout...
+
+                        "%WORKSPACE%\\kubectl.exe" rollout status ^
+                        deployment/mall-parking-app ^
+                        --timeout=300s
+
+                        if errorlevel 1 exit /b 1
+
+                        echo Checking Kubernetes resources...
+
+                        "%WORKSPACE%\\kubectl.exe" get pods
+                        "%WORKSPACE%\\kubectl.exe" get services
+                    '''
+                }
+            }
+        }
     }
 
     post {
         success {
-            echo 'SUCCESS: Application built and Docker image pushed to ACR!'
+            echo 'SUCCESS: Application built, pushed to ACR and deployed to AKS!'
+            echo 'Mall Parking Management CI/CD Pipeline completed successfully.'
         }
 
         failure {
@@ -114,7 +183,7 @@ pipeline {
         }
 
         always {
-            echo 'Mall Parking CI/CD Pipeline execution completed.'
+            echo 'Mall Parking Management Pipeline execution completed.'
         }
     }
 }
