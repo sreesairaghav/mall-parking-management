@@ -3,49 +3,63 @@ pipeline {
     agent any
 
     environment {
+        MAVEN_HOME = 'C:\\Program Files\\Apache\\Maven\\apache-maven-3.9.16'
         ACR_NAME = 'mallparkingacr1793939759'
         ACR_LOGIN = 'mallparkingacr1793939759.azurecr.io'
         IMAGE_NAME = 'mall-parking-app'
-        AKS_NAME = 'mall-parking-aks'
         RESOURCE_GROUP = 'mall-parking-rg'
+        AKS_NAME = 'mall-parking-aks'
     }
 
     stages {
+
         stage('Checkout') {
             steps {
+                echo 'Checking out source code from GitHub'
                 checkout scm
+            }
+        }
+
+        stage('Verify Tools') {
+            steps {
+                bat '''
+                    "%MAVEN_HOME%\\bin\\mvn.cmd" -version
+                    docker --version
+                    az --version
+                '''
             }
         }
 
         stage('Build Application') {
             steps {
-                bat 'mvn clean package -DskipTests'
+                echo 'Building Spring Boot application using Maven'
+                bat '''
+                    "%MAVEN_HOME%\\bin\\mvn.cmd" clean package -DskipTests
+                '''
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                bat 'docker build -t %ACR_LOGIN%/%IMAGE_NAME%:v%BUILD_NUMBER% .'
+                echo 'Building Mall Parking Docker image'
+                bat '''
+                    docker build -t %ACR_LOGIN%/%IMAGE_NAME%:v%BUILD_NUMBER% .
+                '''
             }
         }
 
-        stage('Login to Azure') {
-            steps {
-                bat 'az acr login --name %ACR_NAME%'
-            }
-        }
-
-        stage('Push to ACR') {
-            steps {
-                bat 'docker push %ACR_LOGIN%/%IMAGE_NAME%:v%BUILD_NUMBER%'
-            }
-        }
-
-        stage('Deploy to AKS') {
+        stage('Login to Azure Container Registry') {
             steps {
                 bat '''
-                az aks get-credentials --resource-group %RESOURCE_GROUP% --name %AKS_NAME% --overwrite-existing
-                kubectl apply -f k8s/
+                    az acr login --name %ACR_NAME%
+                '''
+            }
+        }
+
+        stage('Push Image to ACR') {
+            steps {
+                bat '''
+                    docker push %ACR_LOGIN%/%IMAGE_NAME%:v%BUILD_NUMBER%
                 '''
             }
         }
@@ -53,10 +67,15 @@ pipeline {
 
     post {
         success {
-            echo 'Mall Parking CI/CD Pipeline completed successfully!'
+            echo 'SUCCESS: Application built and Docker image pushed to Azure Container Registry!'
         }
+
         failure {
-            echo 'Pipeline failed. Check the console output.'
+            echo 'FAILED: Check the failed stage in Jenkins Console Output.'
+        }
+
+        always {
+            echo 'Mall Parking CI/CD pipeline execution completed.'
         }
     }
 }
