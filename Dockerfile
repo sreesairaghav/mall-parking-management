@@ -1,19 +1,37 @@
-# Multi-stage build: compile with JDK 25, run with a smaller JRE image.
+
+# Stage 1: Build using Java 25 JDK
 FROM eclipse-temurin:25-jdk AS build
+
 WORKDIR /app
 
+# Copy Maven wrapper and project configuration
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
+
 RUN chmod +x mvnw
-RUN ./mvnw -B dependency:go-offline
 
+# Download dependencies
+RUN --mount=type=cache,target=/root/.m2 \
+    ./mvnw -B dependency:go-offline
+
+# Copy source and build application
 COPY src/ src/
-RUN ./mvnw -B clean package -DskipTests
 
-FROM eclipse-temurin:25-jre
+RUN --mount=type=cache,target=/root/.m2 \
+    ./mvnw -B clean package -DskipTests
+
+# Stage 2: Smaller Alpine Java runtime
+FROM eclipse-temurin:25-jre-alpine
+
 WORKDIR /app
-RUN useradd --system --uid 1001 spring
-COPY --from=build /app/target/*.jar app.jar
-USER 1001
+
+# Create non-root user
+RUN addgroup -S spring && adduser -S spring -G spring
+
+COPY --from=build --chown=spring:spring /app/target/*.jar app.jar
+
+USER spring
+
 EXPOSE 8085
+
 ENTRYPOINT ["java", "-jar", "app.jar"]
