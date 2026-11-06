@@ -1,0 +1,49 @@
+---
+- name: Deploy Mall Parking Management with Docker Compose
+  hosts: local
+  gather_facts: false
+  vars:
+    project_dir: "{{ playbook_dir }}/.."
+  tasks:
+    - name: Verify Docker CLI is available
+      ansible.builtin.command: docker --version
+      changed_when: false
+
+    - name: Verify Docker Compose is available
+      ansible.builtin.command: docker compose version
+      changed_when: false
+
+    - name: Verify environment file exists
+      ansible.builtin.stat:
+        path: "{{ project_dir }}/.env"
+      register: env_file
+
+    - name: Stop if environment file is missing
+      ansible.builtin.assert:
+        that: env_file.stat.exists
+        fail_msg: "Create .env from .env.example and configure POSTGRES_PASSWORD first."
+
+    - name: Validate Compose configuration
+      ansible.builtin.command: docker compose config --quiet
+      args:
+        chdir: "{{ project_dir }}"
+      changed_when: false
+      no_log: true
+
+    - name: Build and start application and database
+      ansible.builtin.command: docker compose up --build -d
+      args:
+        chdir: "{{ project_dir }}"
+      register: compose_up
+      changed_when: "'Started' in compose_up.stderr or 'Created' in compose_up.stderr or 'Recreated' in compose_up.stderr or 'Built' in compose_up.stderr"
+
+    - name: Show container status
+      ansible.builtin.command: docker compose ps
+      args:
+        chdir: "{{ project_dir }}"
+      register: containers
+      changed_when: false
+
+    - name: Display container status
+      ansible.builtin.debug:
+        var: containers.stdout_lines
