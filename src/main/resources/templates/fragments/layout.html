@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<!--
+    fragments/layout.html
+    Reusable Thymeleaf fragments consumed by every page template via th:replace.
+    Contains:
+      · sidebar(currentPage)  — dark-navy nav sidebar
+      · topbar(pageTitle)     — sticky top bar with clock, bell, refresh
+      · overlay               — mobile tap-to-close semi-transparent layer
+-->
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head></head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     FRAGMENT: overlay
+     Usage: <div th:replace="~{fragments/layout :: overlay}"></div>
+     ══════════════════════════════════════════════════════════════════════════ -->
+<div th:fragment="overlay"
+     id="sidebarOverlay"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;"
+     class="d-lg-none"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     FRAGMENT: sidebar(currentPage)
+     Usage: <aside th:replace="~{fragments/layout :: sidebar(${currentPage})}"></aside>
+     ══════════════════════════════════════════════════════════════════════════ -->
+<aside th:fragment="sidebar(currentPage)"
+       id="mainSidebar" class="sidebar" aria-label="Main navigation">
+
+    <!-- Brand -->
+    <a class="sidebar-brand" th:href="@{/}" id="sidebarBrandLink">
+        <div class="sidebar-brand-icon">🅿️</div>
+        <div class="sidebar-brand-text">
+            <span class="sidebar-brand-name">MallPark</span>
+            <span class="sidebar-brand-sub">Admin Console</span>
+        </div>
+    </a>
+
+    <!-- Navigation -->
+    <nav class="sidebar-nav" aria-label="Sidebar navigation">
+
+        <div class="nav-section-label">Main</div>
+
+        <div class="nav-item">
+            <a id="navDashboard" th:href="@{/}"
+               th:classappend="${currentPage == 'dashboard'} ? ' active' : ''"
+               class="nav-link">
+                <span class="nav-icon"><i class="bi bi-grid-1x2-fill"></i></span>
+                Dashboard
+            </a>
+        </div>
+
+        <div class="nav-item">
+            <a id="navSlots" th:href="@{/slots}"
+               th:classappend="${currentPage == 'slots'} ? ' active' : ''"
+               class="nav-link">
+                <span class="nav-icon"><i class="bi bi-p-square-fill"></i></span>
+                Parking Slots
+            </a>
+        </div>
+
+        <div class="nav-item">
+            <a id="navVehicles" th:href="@{/vehicles}"
+               th:classappend="${currentPage == 'vehicles'} ? ' active' : ''"
+               class="nav-link">
+                <span class="nav-icon"><i class="bi bi-car-front-fill"></i></span>
+                Vehicles
+            </a>
+        </div>
+
+        <div class="nav-item">
+            <a id="navActivity" th:href="@{/activity}"
+               th:classappend="${currentPage == 'activity'} ? ' active' : ''"
+               class="nav-link">
+                <span class="nav-icon"><i class="bi bi-activity"></i></span>
+                Entry / Exit Log
+            </a>
+        </div>
+
+        <div class="nav-section-label">Finance</div>
+
+        <div class="nav-item">
+            <a id="navRevenue" th:href="@{/revenue}"
+               th:classappend="${currentPage == 'revenue'} ? ' active' : ''"
+               class="nav-link">
+                <span class="nav-icon"><i class="bi bi-cash-coin"></i></span>
+                Revenue
+            </a>
+        </div>
+
+        <div class="nav-item">
+            <a id="navReports" th:href="@{/reports}"
+               th:classappend="${currentPage == 'reports'} ? ' active' : ''"
+               class="nav-link">
+                <span class="nav-icon"><i class="bi bi-bar-chart-line-fill"></i></span>
+                Reports
+            </a>
+        </div>
+
+        <div class="nav-section-label">System</div>
+
+        <div class="nav-item">
+            <a id="navFloors" th:href="@{/floors}"
+               th:classappend="${currentPage == 'floors'} ? ' active' : ''"
+               class="nav-link">
+                <span class="nav-icon"><i class="bi bi-layers-fill"></i></span>
+                Floors
+            </a>
+        </div>
+
+        <div class="nav-item">
+            <a id="navSettings" th:href="@{/settings}"
+               th:classappend="${currentPage == 'settings'} ? ' active' : ''"
+               class="nav-link">
+                <span class="nav-icon"><i class="bi bi-gear-fill"></i></span>
+                Settings
+            </a>
+        </div>
+
+    </nav>
+
+    <!-- User footer -->
+    <div class="sidebar-footer">
+        <div class="sidebar-user" id="sidebarUserBlock"
+             data-bs-toggle="tooltip" data-bs-placement="top" title="Admin Profile">
+            <div class="user-avatar">A</div>
+            <div class="user-info">
+                <div class="user-name">Admin User</div>
+                <div class="user-role">System Administrator</div>
+            </div>
+            <i class="bi bi-three-dots-vertical text-muted" style="font-size:14px;"></i>
+        </div>
+    </div>
+
+</aside>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     FRAGMENT: topbar(pageTitle)
+     Usage: <header th:replace="~{fragments/layout :: topbar(${pageTitle})}"></header>
+     ══════════════════════════════════════════════════════════════════════════ -->
+<header th:fragment="topbar(pageTitle)" class="topbar" id="mainTopbar">
+    <div class="topbar-left">
+        <!-- Mobile hamburger -->
+        <button id="sidebarToggleBtn"
+                class="topbar-btn d-lg-none"
+                aria-label="Toggle sidebar"
+                type="button">
+            <i class="bi bi-list"></i>
+        </button>
+
+        <div>
+            <div class="topbar-title" th:text="${pageTitle}">Page</div>
+            <div class="topbar-subtitle">
+                Mall Parking Management &mdash; Admin Console
+            </div>
+        </div>
+    </div>
+
+    <div class="topbar-right">
+        <!-- Live clock -->
+        <div class="live-badge d-none d-sm-flex">
+            <span class="live-dot"></span>
+            <span id="liveClock">--:--:-- --</span>
+        </div>
+
+        <!-- Notifications -->
+        <button id="notificationsBtn" class="topbar-btn"
+                type="button"
+                aria-label="Notifications"
+                data-bs-toggle="tooltip"
+                data-bs-placement="bottom"
+                title="Notifications">
+            <i class="bi bi-bell"></i>
+            <span class="badge-dot"></span>
+        </button>
+
+        <!-- Refresh -->
+        <button id="refreshBtn" class="topbar-btn"
+                type="button"
+                aria-label="Refresh page"
+                data-bs-toggle="tooltip"
+                data-bs-placement="bottom"
+                title="Refresh"
+                onclick="window.location.reload()">
+            <i class="bi bi-arrow-clockwise"></i>
+        </button>
+    </div>
+</header>
+
+</body>
+</html>

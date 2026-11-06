@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="description" content="Reports — weekly occupancy and revenue analytics for the mall parking system."/>
+    <title th:text="${pageTitle} + ' | Mall Parking Management'">Reports | Mall Parking Management</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' font-size='18' font-family='Arial' font-weight='900' fill='white'%3EP%3C/text%3E%3C/svg%3E"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+
+<div th:replace="~{fragments/layout :: overlay}"></div>
+<aside th:replace="~{fragments/layout :: sidebar(${currentPage})}"></aside>
+
+<div class="main-wrapper">
+    <header th:replace="~{fragments/layout :: topbar(${pageTitle})}"></header>
+
+    <main class="page-content">
+        <nav class="page-breadcrumb" aria-label="breadcrumb">
+            <a th:href="@{/}"><i class="bi bi-house"></i> Home</a>
+            <span class="sep"><i class="bi bi-chevron-right"></i></span>
+            <span class="current" th:text="${pageTitle}">Reports</span>
+        </nav>
+
+        <!-- Summary analytics cards -->
+        <div class="summary-grid" style="grid-template-columns:repeat(4,1fr); margin-bottom:28px;">
+            <div class="summary-card card-occupancy animate-in">
+                <div class="card-icon-wrap"><i class="bi bi-graph-up-arrow"></i></div>
+                <div class="card-body-text">
+                    <div class="card-label">Peak Occupancy</div>
+                    <div class="card-value" style="font-size:26px;" th:text="${peakOccupancy}">91%</div>
+                    <div class="card-trend text-warning"><i class="bi bi-clock"></i> <span th:text="${peakHour}">11 AM</span></div>
+                </div>
+            </div>
+            <div class="summary-card card-total animate-in">
+                <div class="card-icon-wrap"><i class="bi bi-car-front-fill"></i></div>
+                <div class="card-body-text">
+                    <div class="card-label">Total Vehicles Today</div>
+                    <div class="card-value" th:text="${totalVehicles}">187</div>
+                    <div class="card-trend text-info"><i class="bi bi-info-circle"></i> Since midnight</div>
+                </div>
+            </div>
+            <div class="summary-card card-available animate-in">
+                <div class="card-icon-wrap"><i class="bi bi-arrow-repeat"></i></div>
+                <div class="card-body-text">
+                    <div class="card-label">Avg Turnover</div>
+                    <div class="card-value" style="font-size:20px;" th:text="${avgTurnover}">4.2</div>
+                    <div class="card-trend text-success"><i class="bi bi-info-circle"></i> Per slot/day</div>
+                </div>
+            </div>
+            <div class="summary-card card-occupied animate-in">
+                <div class="card-icon-wrap"><i class="bi bi-clock-history"></i></div>
+                <div class="card-body-text">
+                    <div class="card-label">Report Period</div>
+                    <div class="card-value" style="font-size:18px;">This Week</div>
+                    <div class="card-trend text-muted"><i class="bi bi-calendar3"></i> Mon – Sun</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts row -->
+        <div class="row g-4 mb-4">
+            <!-- Weekly Occupancy -->
+            <div class="col-xl-6">
+                <div class="section-header">
+                    <h2 class="section-title"><span class="title-icon"><i class="bi bi-graph-up"></i></span>Weekly Occupancy %</h2>
+                </div>
+                <div class="panel chart-panel">
+                    <div class="chart-legend">
+                        <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div>Occupancy %</div>
+                    </div>
+                    <div class="chart-container" style="height:250px;">
+                        <canvas id="weeklyOccupancyChart" aria-label="Weekly occupancy percentage bar chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weekly Revenue -->
+            <div class="col-xl-6">
+                <div class="section-header">
+                    <h2 class="section-title"><span class="title-icon"><i class="bi bi-currency-rupee"></i></span>Weekly Revenue (₹)</h2>
+                </div>
+                <div class="panel chart-panel">
+                    <div class="chart-legend">
+                        <div class="legend-item"><div class="legend-dot" style="background:#10b981;"></div>Revenue ₹</div>
+                    </div>
+                    <div class="chart-container" style="height:250px;">
+                        <canvas id="weeklyRevenueChart" aria-label="Weekly revenue bar chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floor performance table -->
+        <div class="section-header">
+            <h2 class="section-title"><span class="title-icon"><i class="bi bi-layers-fill"></i></span>Floor Performance Summary</h2>
+        </div>
+        <div class="panel">
+            <table class="table floor-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Floor</th>
+                        <th class="text-center">Total Slots</th>
+                        <th class="text-center">Vehicles Served</th>
+                        <th class="text-center">Avg Occupancy</th>
+                        <th>Occupancy Bar</th>
+                        <th class="text-end">Revenue Share</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="floor-code-badge">B1</span> Basement Floor 1</td>
+                        <td class="text-center fw-600">150</td>
+                        <td class="text-center fw-600">79</td>
+                        <td class="text-center fw-700 text-danger">92%</td>
+                        <td><div class="occ-bar-wrap"><div class="occ-bar-track"><div class="occ-bar-fill" data-pct="92" style="width:0%"></div></div><span class="occ-pct">92%</span></div></td>
+                        <td class="text-end fw-700 text-success">₹4,840</td>
+                    </tr>
+                    <tr>
+                        <td><span class="floor-code-badge">B2</span> Basement Floor 2</td>
+                        <td class="text-center fw-600">150</td>
+                        <td class="text-center fw-600">64</td>
+                        <td class="text-center fw-700 text-warning">74.7%</td>
+                        <td><div class="occ-bar-wrap"><div class="occ-bar-track"><div class="occ-bar-fill" data-pct="74.7" style="width:0%"></div></div><span class="occ-pct">74.7%</span></div></td>
+                        <td class="text-end fw-700 text-success">₹3,682</td>
+                    </tr>
+                    <tr>
+                        <td><span class="floor-code-badge">GF</span> Ground Floor</td>
+                        <td class="text-center fw-600">150</td>
+                        <td class="text-center fw-600">44</td>
+                        <td class="text-center fw-700 text-info">41.3%</td>
+                        <td><div class="occ-bar-wrap"><div class="occ-bar-track"><div class="occ-bar-fill" data-pct="41.3" style="width:0%"></div></div><span class="occ-pct">41.3%</span></div></td>
+                        <td class="text-end fw-700 text-success">₹2,398</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<!-- Data bridge for charts -->
+<script th:inline="javascript">
+/*<![CDATA[*/
+window.reportData = {
+    weeklyOccupancy : /*[[${weeklyOccupancy}]]*/ [],
+    weeklyRevenue   : /*[[${weeklyRevenue}]]*/   []
+};
+/*]]>*/
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc4s9bIOgUxi8T/jzmMEJEzpVqSvjMsFHDUEEhiHk0dObFBMwRHk7KGBhPJYQCRQg" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script th:src="@{/js/common.js}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const d = window.reportData || {};
+
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.color       = '#94a3b8';
+
+    // Weekly Occupancy Bar
+    const octx = document.getElementById('weeklyOccupancyChart');
+    if (octx) new Chart(octx, {
+        type: 'bar',
+        data: {
+            labels: days,
+            datasets: [{
+                label: 'Occupancy %',
+                data: d.weeklyOccupancy || [],
+                backgroundColor: 'rgba(59,130,246,0.75)',
+                borderColor: '#2563eb',
+                borderWidth: 1,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false },
+                tooltip: { backgroundColor:'#0d1b2a', titleColor:'#e2e8f0', bodyColor:'#94a3b8',
+                    callbacks: { label: c => ` ${c.parsed.y}% occupancy` } } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { min: 0, max: 100, grid: { color: '#f1f5f9' },
+                    ticks: { callback: v => v + '%', maxTicksLimit: 6 } }
+            }
+        }
+    });
+
+    // Weekly Revenue Bar
+    const rctx = document.getElementById('weeklyRevenueChart');
+    if (rctx) new Chart(rctx, {
+        type: 'bar',
+        data: {
+            labels: days,
+            datasets: [{
+                label: 'Revenue ₹',
+                data: d.weeklyRevenue || [],
+                backgroundColor: 'rgba(16,185,129,0.75)',
+                borderColor: '#10b981',
+                borderWidth: 1,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false },
+                tooltip: { backgroundColor:'#0d1b2a', titleColor:'#e2e8f0', bodyColor:'#94a3b8',
+                    callbacks: { label: c => ` ₹${c.parsed.y.toLocaleString('en-IN')}` } } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { color: '#f1f5f9' },
+                    ticks: { callback: v => '₹' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v), maxTicksLimit: 6 } }
+            }
+        }
+    });
+});
+</script>
+</body>
+</html>
