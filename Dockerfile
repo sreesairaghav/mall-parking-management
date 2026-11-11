@@ -18,13 +18,11 @@ COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
 RUN chmod +x mvnw
 
-RUN --mount=type=cache,target=/root/.m2 \
-    ./mvnw -B -q dependency:go-offline
+RUN ./mvnw -B -q dependency:go-offline
 
 COPY src/ src/
 
-RUN --mount=type=cache,target=/root/.m2 \
-    ./mvnw -B -q clean package -DskipTests \
+RUN ./mvnw -B -q clean package -DskipTests \
  && cp target/*.jar app.jar \
  && java -Djarmode=tools -jar app.jar extract --layers --destination extracted \
  && mkdir -p extracted/dependencies extracted/spring-boot-loader \
