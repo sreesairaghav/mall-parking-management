@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -12,6 +11,16 @@ pipeline {
         ACR_LOGIN = 'mallparkingacr1793939759.azurecr.io'
         IMAGE_NAME = 'mall-parking-app'
 
+        // Branch-aware image tags (multibranch pipeline sets BRANCH_NAME)
+        //   main          -> main-v12,          main-latest
+        //   dockerfileopt -> dockerfileopt-v3,  dockerfileopt-latest
+        IMAGE_TAG = "${env.BRANCH_NAME}-v${env.BUILD_NUMBER}"
+        LATEST_TAG = "${env.BRANCH_NAME}-latest"
+
+        // Branches compared in the image size report
+        BASE_BRANCH = 'main'
+        OPT_BRANCH = 'dockerfileopt'
+
         // Azure Kubernetes Service
         RESOURCE_GROUP = 'mall-parking-rg'
         AKS_NAME = 'mall-parking-aks'
@@ -21,7 +30,7 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                echo 'Checking out source code from GitHub'
+                echo "Checking out branch ${env.BRANCH_NAME} from GitHub"
                 checkout scm
             }
         }
@@ -50,10 +59,10 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                echo 'Building Mall Parking Docker image'
+                echo "Building Docker image ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
 
                 bat '''
-                    docker build -t %ACR_LOGIN%/%IMAGE_NAME%:v%BUILD_NUMBER% .
+                    docker build -t %ACR_LOGIN%/%IMAGE_NAME%:%IMAGE_TAG% -t %ACR_LOGIN%/%IMAGE_NAME%:%LATEST_TAG% .
                 '''
             }
         }
@@ -95,15 +104,81 @@ pipeline {
 
         stage('Push Image to ACR') {
             steps {
-                echo 'Pushing Docker image to ACR'
+                echo "Pushing ${env.IMAGE_TAG} and ${env.LATEST_TAG} to ACR"
 
                 bat '''
-                    docker push %ACR_LOGIN%/%IMAGE_NAME%:v%BUILD_NUMBER%
+                    docker push %ACR_LOGIN%/%IMAGE_NAME%:%IMAGE_TAG%
+                    docker push %ACR_LOGIN%/%IMAGE_NAME%:%LATEST_TAG%
                 '''
             }
         }
 
+        stage('Compare Image Sizes') {
+            steps {
+                echo "Comparing ${env.BASE_BRANCH} vs ${env.OPT_BRANCH} image sizes"
+
+                powershell '''
+                    $ErrorActionPreference = "Continue"
+                    $repo = "$env:ACR_LOGIN/$env:IMAGE_NAME"
+
+                    # The image just built on this branch is local; pull the other branch's latest from ACR
+                    if ($env:BRANCH_NAME -eq $env:BASE_BRANCH) {
+                        $baseImg = "${repo}:$env:IMAGE_TAG"
+                        $optImg  = "${repo}:$env:OPT_BRANCH-latest"
+                        $otherImg = $optImg
+                    } else {
+                        $baseImg = "${repo}:$env:BASE_BRANCH-latest"
+                        $optImg  = "${repo}:$env:IMAGE_TAG"
+                        $otherImg = $baseImg
+                    }
+
+                    docker pull $otherImg | Out-Null
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Host "Image $otherImg is not in ACR yet. Build the other branch once, then re-run to get the comparison."
+                        exit 0
+                    }
+
+                    $baseSize = [int64](docker image inspect -f "{{.Size}}" $baseImg)
+                    $optSize  = [int64](docker image inspect -f "{{.Size}}" $optImg)
+                    $saved    = $baseSize - $optSize
+                    $pct      = [math]::Round(($saved / $baseSize) * 100, 2)
+
+                    $report = @()
+                    $report += "=========== IMAGE SIZE COMPARISON ==========="
+                    $report += "Build      : $env:BRANCH_NAME #$env:BUILD_NUMBER"
+                    $report += ("{0,-14}: {1,10:N2} MB   ({2})" -f "$env:BASE_BRANCH", ($baseSize / 1MB), $baseImg)
+                    $report += ("{0,-14}: {1,10:N2} MB   ({2})" -f "$env:OPT_BRANCH", ($optSize / 1MB), $optImg)
+                    $report += ("{0,-14}: {1,10:N2} MB   ({2} % smaller)" -f "Saved", ($saved / 1MB), $pct)
+                    $report += "=============================================="
+                    $report += ""
+                    $report += "--- Layers: $env:BASE_BRANCH ---"
+                    $report += (docker history --format "{{.Size}}`t{{.CreatedBy}}" $baseImg)
+                    $report += ""
+                    $report += "--- Layers: $env:OPT_BRANCH ---"
+                    $report += (docker history --format "{{.Size}}`t{{.CreatedBy}}" $optImg)
+                    $report += ""
+                    $report += "--- Local images ---"
+                    $report += (docker images $repo --format "table {{.Repository}}:{{.Tag}}`t{{.Size}}")
+                    $report += ""
+                    $report += "--- Tags in ACR ---"
+                    $report += (& $env:AZURE_CLI acr repository show-tags --name $env:ACR_NAME --repository $env:IMAGE_NAME --orderby time_desc --output table)
+
+                    $report | ForEach-Object { Write-Host $_ }
+                    $report | Out-File -Encoding utf8 image-size-report.txt
+                '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'image-size-report.txt', allowEmptyArchive: true
+                }
+            }
+        }
+
         stage('Deploy to AKS') {
+            // Only the main branch is deployed; feature branches stop after pushing to ACR
+            when {
+                branch 'main'
+            }
             steps {
                 echo 'Deploying application to Azure Kubernetes Service'
 
@@ -150,7 +225,7 @@ pipeline {
 
                         "%WORKSPACE%\\kubectl.exe" set image ^
                         deployment/mall-parking-app ^
-                        mall-parking-app=%ACR_LOGIN%/%IMAGE_NAME%:v%BUILD_NUMBER%
+                        mall-parking-app=%ACR_LOGIN%/%IMAGE_NAME%:%IMAGE_TAG%
 
                         if errorlevel 1 exit /b 1
 
@@ -174,8 +249,8 @@ pipeline {
 
     post {
         success {
-            echo 'SUCCESS: Application built, pushed to ACR and deployed to AKS!'
-            echo 'Mall Parking Management CI/CD Pipeline completed successfully.'
+            echo "SUCCESS: ${env.BRANCH_NAME} built and pushed to ACR as ${env.IMAGE_NAME}:${env.IMAGE_TAG}"
+            echo 'See image-size-report.txt in the build artifacts for the size comparison.'
         }
 
         failure {
