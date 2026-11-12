@@ -18,3 +18,4 @@ HELP.md
 k8s/
 ansible/
 src/test/
+*.exe
