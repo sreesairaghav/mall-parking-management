@@ -221,11 +221,15 @@ pipeline {
 
                         if errorlevel 1 exit /b 1
 
-                        echo Updating Mall Parking application...
+                        echo Applying database manifest...
 
-                        "%WORKSPACE%\\kubectl.exe" set image ^
-                        deployment/mall-parking-app ^
-                        mall-parking-app=%ACR_LOGIN%/%IMAGE_NAME%:%IMAGE_TAG%
+                        "%WORKSPACE%\\kubectl.exe" apply -f k8s\\postgres.yaml
+
+                        if errorlevel 1 exit /b 1
+
+                        echo Deploying Mall Parking application %IMAGE_TAG%...
+
+                        powershell -NoProfile -Command "(Get-Content k8s\\app.yaml) -replace ':main-latest', ':%IMAGE_TAG%' | & '%WORKSPACE%\\kubectl.exe' apply -f -"
 
                         if errorlevel 1 exit /b 1
 
