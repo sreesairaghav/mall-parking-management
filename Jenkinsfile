@@ -198,7 +198,7 @@ pipeline {
 
                         echo Installing Kubernetes CLI tools...
 
-                        "%AZURE_CLI%" aks install-cli ^
+                        call "%AZURE_CLI%" aks install-cli ^
                         --install-location "%WORKSPACE%\\kubectl.exe" ^
                         --kubelogin-install-location "%WORKSPACE%\\kubelogin.exe"
 
@@ -206,7 +206,7 @@ pipeline {
 
                         echo Connecting to AKS...
 
-                        "%AZURE_CLI%" aks get-credentials ^
+                        call "%AZURE_CLI%" aks get-credentials ^
                         --resource-group %RESOURCE_GROUP% ^
                         --name %AKS_NAME% ^
                         --overwrite-existing
