@@ -29,3 +29,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+
+# Kubernetes secrets (use k8s/postgres-secret.example.yaml as the template)
+k8s/postgres-secret.yaml
